@@ -1,33 +1,36 @@
-# Wikimedia Commons Media Downloader
+# Commons Wikimedia Bulk Downloader
+Command-line interface: `cwbd`
 
-This project provides a command-line tool to extract and download media files from [Wikimedia commons](https://commons.wikimedia.org/) based on specific categories. 
-It is designed to efficiently process extremely large SQL dump files (pages, categories and linktargets) and download media files in parallel while avoiding duplicate downloads.
+This tool enables you to extract and download large sets of media files from **[Wikimedia commons](https://commons.wikimedia.org/)** by processing raw SQL dump files.
+it does **not** use the MediaWiki API. It reads the SQL dumps directly to reconstruct media associations and perform bulk downloads.
 
----
+Wiki media makes database dumps (or **[SQL dumps](https://dumps.wikimedia.org/commonswiki/latest/)**) publicly available, including category links, page tables and linktargets used by this tool.
+
 
 ## Features
-- Parse Wikimedia Commons SQL dumps to find media files in user-specified categories.
-- Track progress across runs to avoid re-processing already scanned categories.
-- Download images in parallel using multithreading with configurable workers count.
-- Skip already downloaded or invalid files.
-- Supports recursive category scanning if needed.
-- Store metadata of downloaded files in JSON for easy tracking
+- **Offline processing**: Operates entirely on local SQL dump files. No API acces required.
+- **Category-driven downloads**: Scans and resolves all media files linked to specified Commons categories.
+- **Recursive search**: Support for (nested) subcategory scanning.
+- **Resumable tracking**: Keeps a JSON index of discovered files for incremental runs.
+- **Multi-threaded downloader**: Efficiently fetches large numbres of files via concurrent workers.
 
 ## Installation
 
 1. Clone the repository
 ```bash
-git clone <repo_url>
-cd <repo_folder>
+git clone https://github.com/Jordieboyz/commonswiki-bulk-downloader.git
+cd commonswiki-bulk-downloader
 ```
-2. Install required Python Packages:
+2. Install the package in editable mode (optionally make use of a [virtual environment](https://docs.python.org/3/library/venv.html)):
 ```bash
-pip install requests
+pip install -e .
 ```
-3. Prepare Wikimedia Commons [SQL dumps](https://dumps.wikimedia.org/commonswiki/latest/):  
-`commonswiki-latest-categorylinks.sql.gz`    
-`commonswiki-latest-page.sql.gz`  
-`commonswiki-latest-linktarget.sql.gz`
+This install the `cwbd` command globally in the active environment.  
+
+3. Prepare\download Wikimedia Commons [SQL dumps](https://dumps.wikimedia.org/commonswiki/latest/):  
+`commonswiki-latest-categorylinks.sql.gz` (~ +10GB)   
+`commonswiki-latest-page.sql.gz` (~ 6GB)  
+`commonswiki-latest-linktarget.sql.gz` (~ +2GB)
 
 Place them in a directory (e.g. `./dumps`).
 
@@ -36,7 +39,7 @@ Place them in a directory (e.g. `./dumps`).
 ## Usage
 Run the script via the command line:
 ```bash
-python main.py --category-file categories.txt --dumps-dir ./dumps --output-dir ./downloads --workers 10
+cwbd --category-file categories.txt --dumps-dir ./dumps --output-dir ./downloads --workers 10
 ```
 
 ### Arguments
@@ -70,5 +73,6 @@ Combine results from all dumps to asseciate files with categories.
 - Downloads run in parallel.
 
 ## Notes
+- Wikimedia Commons media dumps are not provided in a single archival image/tarbal. Tools like this help bridge that gap.
 - The tool is optimized for very large Wikimedia dumps. Performace depends on available memory and CPU threads
 - Ensure network connectivity for downloading media files.

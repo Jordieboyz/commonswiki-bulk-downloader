@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 from .cli import get_cli_input
@@ -7,7 +8,6 @@ from .scanner import scan_commons_db
 from .download import download_media_files
 from .context import ProgramContext
 
-# TODO: ??? request amount of files in category through API
 
 def get_phase_max(dump_file : Path, ctx : ProgramContext):
   """
@@ -27,6 +27,7 @@ def get_phase_max(dump_file : Path, ctx : ProgramContext):
     case _ if dump_file == ctx.linktarget_dump:
       return len(ctx.process_categories)
     case _ if dump_file == ctx.category_dump:
+      # TODO: ??? request amount of files in category through API
       return 0
     case _ if dump_file == ctx.page_dump:
       return len(ctx.program_set)
@@ -50,7 +51,7 @@ def find_media_file_titles(ctx : ProgramContext):
   for dump_file, output_file in ctx.program_files.items():
     print(f'Processing: {dump_file}...')
 
-    if not ctx.recursive_search:
+    if not ctx.rsearch:
       ctx.max_phase_matches = get_phase_max(dump_file, ctx)
     
     scan_commons_db(dump_file, output_file, ctx)
@@ -158,6 +159,49 @@ def load_normalized_categories_from_file(infile : str):
   with open(infile, 'r', encoding='utf-8') as f:
     return set(normalize(norm_title) for norm_title in f.read().splitlines() if norm_title.strip())
 
+def clean_program_files():
+  """
+  Remove program-generated files and directories used for bookkeeping and resuming runs.
+
+  This function deletes only internal artifacts created by the program itself and
+  explicitly avoids removing any user-provided inputs or downloaded media files.
+
+  The following items are removed if present:
+      - Scanner checkpoint directory and its contents
+      - Scanner progress file
+      - Per-phase scan output files
+      - Categorized file title JSON output
+      - Python __pycache__ directories inside the project tree
+
+  Args:
+      ctx (ProgramContext): Active program context containing derived paths.
+
+  Return:
+      None
+
+  Notes:
+      - This operation is destructive and cannot be undone.
+      - Safe to call multiple times.
+      - Missing files or directories are ignored silently.
+  """
+  ctx = ProgramContext()
+
+  if ctx.checkpoint_dir.exists():
+    shutil.rmtree(ctx.checkpoint_dir, ignore_errors=True)
+
+  if ctx.found_files.exists():
+    ctx.found_files.unlink()
+
+  if ctx.invalid_files.exists():
+    ctx.invalid_files.unlink()
+
+  project_root = Path.cwd()
+
+  for pycache in project_root.rglob("__pycache__"):
+    if pycache.is_dir():
+      shutil.rmtree(pycache, ignore_errors=True)
+
+
 def main():
   """
   Main entry point for the Commonswiki Bulk Downloader CLI.
@@ -177,21 +221,49 @@ def main():
   """
   args = get_cli_input()
 
-  ctx = ProgramContext(
-    dump_dir=Path(args.dumps_dir),
-    output_dir=Path(args.output_dir),
-    input_categories=load_normalized_categories_from_file(args.category_file),
-    recursive_search=args.no_recursive_search,
-    max_workers=args.workers,
-  )
+  match args.command:
+    case 'clean':
+      clean_program_files()
+    case 'fetch':
+      ctx = ProgramContext.init_fetch(
+        dumps_dir=Path(args.dumps_dir),
+        input_categories=load_normalized_categories_from_file(args.category_file),
+        recursive_search=args.no_recursive_search
+      )
 
-  ctx.process_categories = ctx.input_categories - set(get_json_data(ctx.found_files))
-  if ctx.process_categories:
-    find_media_file_titles(ctx)
-    update_found_files(ctx.found_files, retrace(ctx))
+      ctx.process_categories = ctx.categories - set(get_json_data(ctx.found_files))
+      if ctx.process_categories:
+        find_media_file_titles(ctx)
+        update_found_files(ctx.found_files, retrace(ctx))
+    
+    case 'download':
+      ctx = ProgramContext.init_download(
+        output_dir=Path(args.output_dir),
+        input_categories=load_normalized_categories_from_file(args.category_file),
+        recursive_search=args.no_recursive_search,
+        max_workers=args.workers,
+      )
+          
+      download_media_files(ctx)
+      
+    case 'run':
+      pctx = ProgramContext.init_run(
+        dumps_dir=Path(args.dumps_dir),
+        output_dir=Path(args.output_dir),
+        input_categories=load_normalized_categories_from_file(args.category_file),
+        recursive_search=args.no_recursive_search,
+        max_workers=args.workers,
+      )
+      
+      pctx.process_categories = pctx.categories - set(get_json_data(pctx.found_files))
+      if pctx.process_categories:
+        find_media_file_titles(pctx)
+        update_found_files(pctx.found_files, retrace(pctx))
 
-  download_media_files(ctx)
+      download_media_files(pctx)
+
+    case _ :
+      print('Not a valid CLI argument, check the documenation for possible CLI arguments.')
 
 if __name__ == '__main__':
   main()
-  

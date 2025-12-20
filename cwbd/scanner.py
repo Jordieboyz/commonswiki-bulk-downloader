@@ -92,6 +92,7 @@ def extract_match(line : str, pp : dict):
       List: A list of processed match results (filtered by handler)
   """
   matches = []
+  # TODO: explore options using iter instead of findall for memory purposes.
   for m in pp['regex'].findall(line):
     if (res := pp['handler'](m)):
       matches.append(res)
@@ -122,7 +123,7 @@ def lt_handler(ctx : ProgramContext, match : tuple):
   
   if ns == WikiNamespace.CATEGORY:
     for cat in ctx.process_categories:
-      if ctx.recursive_search:
+      if ctx.rsearch:
         if title.startswith(cat):
           return fformat(id, title)
       else:

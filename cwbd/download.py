@@ -98,10 +98,15 @@ def download_media_files(pctx :ProgramContext):
     open(pctx.invalid_files, 'w').close()
 
   pctx.downloads_set = collect_existing_filenames([pctx.output_dir])
+  
   file_category_titles_dict = get_json_data(pctx.found_files)
-
+  if not file_category_titles_dict:
+    print('No downloadable files found!')
+    print('Make sure to run \'cwbd fetch <arguments>\' first!')
+    return
+  
   for category, subfields in file_category_titles_dict.items():
-    if not any(category == c for c in pctx.input_categories):
+    if not any(category == c for c in pctx.categories):
       continue
 
     if not (files := subfields.get("files", [])):

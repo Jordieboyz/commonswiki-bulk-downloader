@@ -17,8 +17,8 @@ class ProgramContext:
       - Most mutable fields are used to track prograss and resume interrupted runs.
 
   """
-  dump_dir : Path
-  output_dir : Path
+  _dump_dir : Path = None
+  _output_dir : Path = None
 
   page_dump: Path = field(init=False)
   category_dump: Path = field(init=False)
@@ -28,15 +28,15 @@ class ProgramContext:
   progress_scanner : Path = field(init=False)
 
   program_set : set = field(default_factory=set)
-  input_categories : set = field(default_factory=set)
+  _input_categories : set = field(default_factory=set)
   process_categories : set = field(default_factory=set)
   
   pfiles : dict =  field(default_factory=dict)
 
   save_interval : int = 100
-  max_workers : int = field(default_factory=int)
+  _max_workers : int = field(default_factory=int)
 
-  recursive_search : bool = field(default_factory=bool)
+  _recursive_search : bool = field(default_factory=bool)
   max_phase_matches = 0
 
   found_files : Path = field(init=False)
@@ -55,22 +55,62 @@ class ProgramContext:
         - Initializes per-phase scan output files.
         - Resets scanner progress when category input has changed significantly.
     """
-    # setup for fetching system
-    self.page_dump = self.dump_dir / 'commonswiki-latest-page.sql.gz'
-    self.category_dump = self.dump_dir / 'commonswiki-latest-categorylinks.sql.gz'
-    self.linktarget_dump = self.dump_dir / 'commonswiki-latest-linktarget.sql.gz'
-
     self.checkpoint_dir = Path('checkpoint')
     self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     self.progress_scanner = self.checkpoint_dir / 'progress_scanner.txt'
 
-    self.init_program_files()
-
     # setup for download system
     self.found_files = Path('Categorized_file_titles.json')
-    self.invalid_files = self.output_dir / 'invalid.txt'
+    self.invalid_files = self.checkpoint_dir / 'invalid.txt'
 
+    # self.reset_scanner()
+  
+  @classmethod
+  def init_run(cls, *, dumps_dir : Path, output_dir : Path, input_categories : set[str], 
+                    recursive_search : bool, max_workers : int):
+    ctx = ProgramContext(
+      _dump_dir=dumps_dir,
+      _output_dir=output_dir,
+      _input_categories=input_categories,
+      _recursive_search=recursive_search,
+      _max_workers=max_workers,
+    )
+
+    ctx.__init_dump_files()
+    return ctx
+  
+  @classmethod
+  def init_download(cls, *, output_dir : Path, input_categories : set[str], 
+                    recursive_search : bool, max_workers : int):
+    return ProgramContext(
+      _output_dir=output_dir,
+      _input_categories=input_categories,
+      _recursive_search=recursive_search,
+      _max_workers=max_workers
+     )
+
+  @classmethod
+  def init_fetch(cls, *, dumps_dir : Path, input_categories : set[str], recursive_search : bool):
+    ctx = cls(
+      _dump_dir=dumps_dir,
+      _input_categories=input_categories,
+      _recursive_search=recursive_search
+     )
+
+    ctx.__init_dump_files()
+    return ctx
+
+  def __init_dump_files(self):
+    if not self._dump_dir:
+      raise ValueError("dump_dir must be provided for fetch")
+     
+    # setup for fetching system
+    self.page_dump = self._dump_dir / 'commonswiki-latest-page.sql.gz'
+    self.category_dump = self._dump_dir / 'commonswiki-latest-categorylinks.sql.gz'
+    self.linktarget_dump = self._dump_dir / 'commonswiki-latest-linktarget.sql.gz'
+
+    self.init_program_files()
     self.reset_scanner()
 
   def init_program_files(self):
@@ -108,9 +148,9 @@ class ProgramContext:
       existing = set(x.strip() for x in first_line.split(',')) if first_line else set()
       
       found_cats = get_json_data(self.found_files)
-      if not self.input_categories.issubset(existing) and not all(cat in found_cats for cat in self.input_categories):
+      if not self._input_categories.issubset(existing) and not all(cat in found_cats for cat in self._input_categories):
         f.truncate(0)
-        f.write(",".join(sorted(self.input_categories))+'\n')
+        f.write(",".join(sorted(self._input_categories))+'\n')
 
         try:
           self.program_files[self.linktarget_dump].unlink()
@@ -124,3 +164,23 @@ class ProgramContext:
     if not self.pfiles:
       self.init_program_files()
     return self.pfiles
+  
+  @property
+  def categories(self):
+    return self._input_categories
+  
+  @property
+  def dump_dir(self):
+    return self._dump_dir
+  
+  @property
+  def output_dir(self):
+    return self._output_dir
+  
+  @property
+  def rsearch(self):
+    return self._recursive_search
+  
+  @property
+  def max_workers(self):
+    return self._max_workers

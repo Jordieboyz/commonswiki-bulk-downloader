@@ -28,11 +28,34 @@ def get_cli_input():
     prog="cwbd",
     description="Commons Wikimedia Bulk Donwloader (SQL dump based)"
   )
-  
+
   subparsers = parser.add_subparsers(
-    dest="command",
-    required=True
+    dest="command"
   )
+
+  # -------------------------------------------------------------------
+  # Clean
+  # -------------------------------------------------------------------
+  subparsers.add_parser(
+    "clean",
+    help="Remove generated folders and files used during fetch or download phase."
+  )
+
+  # -------------------------------------------------------------------
+  # Run
+  # -------------------------------------------------------------------
+  run = subparsers.add_parser(
+    "run",
+    help="Fetch and download media files."
+  )
+
+  run.add_argument("--category-file", "-c", type=str, required=True, help="File with categories")
+  run.add_argument("--dumps-dir", "-d", type=str, required=True, help="Directory with SQL dumps")
+  run.add_argument("--output-dir", "-o", type=str, required=True, help="Download directory")
+  run.add_argument("--workers", "-w", type=int, default=10, help="Number of parallel downloads")
+  run.add_argument("--no-recursive-search", action='store_false', help="Recursively scan subcategories")
+
+
 
   # -------------------------------------------------------------------
   # Fetch
@@ -68,22 +91,23 @@ def get_cli_input():
   download.add_argument("--workers",      "-w", type=int,  default=10,    
                       help="Number of parallel download threads")
   
-  # -------------------------------------------------------------------
-  # Clean
-  # -------------------------------------------------------------------
-  clean = subparsers.add_parser(
-    "clean",
-    help="Remove generated folders and files used during fetch or download phase."
-  )
+  download.add_argument("--no-recursive-search", action='store_false',  
+                    help="Prevent program to recursively obtain all media files in subcategories")
+  
+
 
   args = parser.parse_args()
 
-  if args.command != "clean":
+  if args.command is None:
+    parser.print_help()
+    sys.exit(1)
+
+  if args.command in ("fetch", "download", "run"):
     if not os.path.isfile(args.category_file):
       print(f'[ERROR] File does not exist: {args.category_file}', file=sys.stderr)
       sys.exit(1)
 
-  if args.commadn == "fetch":
+  if args.command == ("fetch", "run"):
     if not os.path.isdir(args.dumps_dir):
       print(f'[ERROR] Directory does not exist: {args.dumps_dir}', file=sys.stderr)
       sys.exit(1)

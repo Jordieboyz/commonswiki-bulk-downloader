@@ -50,7 +50,7 @@ cwbd --category-file categories.txt --dumps-dir ./dumps --output-dir ./downloads
 | --dumps-dir               | -d        | str       | Directory containing Commons SQL dump files.                     
 | --output-dir              | -o        | str       | Directory where downloaded images will be saved.                 
 | --workers                 | -w        | int       | Number of parallel download threads (default: 10).               
-| --no-recursive-search     |           | flag      | Disable recursive search for subcategories.                      
+| --recursive-search        |           | flag      | Disable recursive search for subcategories.                      
 
 
 ## Program Workflow  

@@ -228,7 +228,7 @@ def main():
       ctx = ProgramContext.init_fetch(
         dumps_dir=Path(args.dumps_dir),
         input_categories=load_normalized_categories_from_file(args.category_file),
-        recursive_search=args.no_recursive_search
+        recursive_search=args.recursive_search
       )
 
       ctx.process_categories = ctx.categories - set(get_json_data(ctx.found_files))
@@ -240,18 +240,18 @@ def main():
       ctx = ProgramContext.init_download(
         output_dir=Path(args.output_dir),
         input_categories=load_normalized_categories_from_file(args.category_file),
-        recursive_search=args.no_recursive_search,
+        recursive_search=args.recursive_search,
         max_workers=args.workers,
       )
           
       download_media_files(ctx)
-      
+
     case 'run':
       pctx = ProgramContext.init_run(
         dumps_dir=Path(args.dumps_dir),
         output_dir=Path(args.output_dir),
         input_categories=load_normalized_categories_from_file(args.category_file),
-        recursive_search=args.no_recursive_search,
+        recursive_search=args.recursive_search,
         max_workers=args.workers,
       )
       

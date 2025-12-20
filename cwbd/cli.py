@@ -53,7 +53,7 @@ def get_cli_input():
   run.add_argument("--dumps-dir", "-d", type=str, required=True, help="Directory with SQL dumps")
   run.add_argument("--output-dir", "-o", type=str, required=True, help="Download directory")
   run.add_argument("--workers", "-w", type=int, default=10, help="Number of parallel downloads")
-  run.add_argument("--no-recursive-search", action='store_false', help="Recursively scan subcategories")
+  run.add_argument("--recursive-search", action='store_true', help="Recursively scan subcategories")
 
 
 
@@ -71,7 +71,7 @@ def get_cli_input():
   fetch.add_argument("--dumps-dir",    "-d", type=str,  required=True, 
                       help="Directory containing Commons SQL dump files")
   
-  fetch.add_argument("--no-recursive-search", action='store_false',  
+  fetch.add_argument("--recursive-search", action='store_true',  
                       help="Prevent program to recursively obtain all media files in subcategories")
 
   # -------------------------------------------------------------------
@@ -91,7 +91,7 @@ def get_cli_input():
   download.add_argument("--workers",      "-w", type=int,  default=10,    
                       help="Number of parallel download threads")
   
-  download.add_argument("--no-recursive-search", action='store_false',  
+  download.add_argument("--recursive-search", action='store_true',  
                     help="Prevent program to recursively obtain all media files in subcategories")
   
 

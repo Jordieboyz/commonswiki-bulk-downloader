@@ -3,8 +3,8 @@ from itertools import repeat
 from concurrent.futures import ThreadPoolExecutor
 import requests
 
-from context import ProgramContext
-from download_utils import get_json_data
+from .context import ProgramContext
+from .download_utils import get_json_data
 
 def collect_existing_filenames(folders : list[str]):
   """

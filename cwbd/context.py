@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from download_utils import get_json_data
+from .download_utils import get_json_data
 
 @dataclass
 class ProgramContext:

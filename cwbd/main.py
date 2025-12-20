@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
 
-from cli import get_cli_input
-from download_utils import *
-from scanner import scan_commons_db
-from download import download_media_files
-from context import ProgramContext
+from .cli import get_cli_input
+from .download_utils import *
+from .scanner import scan_commons_db
+from .download import download_media_files
+from .context import ProgramContext
 
 # TODO: ??? request amount of files in category through API
 

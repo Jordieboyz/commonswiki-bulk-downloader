@@ -2,8 +2,8 @@ import gzip
 import re
 from functools import partial
 
-from download_utils import *
-from context import ProgramContext
+from .download_utils import *
+from .context import ProgramContext
 
 def count_lines_fast(file) :
   try:

@@ -40,7 +40,8 @@ def get_cli_input():
                       help="Recursively obtain all media files in subcategories")
 
   args = parser.parse_args()
-
+  print(os.getcwd())
+  print(args.category_file)
   if not os.path.isfile(args.category_file):
     print(f'[ERROR] File does not exist: {args.category_file}', file=sys.stderr)
     sys.exit(1)

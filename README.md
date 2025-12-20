@@ -1,5 +1,4 @@
-# Commons Wikimedia Bulk Downloader
-Command-line interface: `cwbd`
+# Commons Wikimedia Bulk Downloader `(cwbd)`
 
 This tool enables you to extract and download large sets of media files from **[Wikimedia commons](https://commons.wikimedia.org/)** by processing raw SQL dump files.
 it does **not** use the MediaWiki API. It reads the SQL dumps directly to reconstruct media associations and perform bulk downloads.
@@ -40,17 +39,39 @@ Wiki media makes database dumps (or **[SQL dumps](https://dumps.wikimedia.org/co
 ## Usage
 Run the script via the command line:
 ```bash
-cwbd --category-file categories.txt --dumps-dir ./dumps --output-dir ./downloads --workers 10
+cwbd <command> [options]
 ```
 
 ### Arguments
-| **Option**                | **Short** | **Type**  | **Description**                                                   
-|---------------------------|-----------|-----------|------------------------------------------------------------------
-| --category-file           | -c        | str       | Path to the file containing desired categories (one per line).   
-| --dumps-dir               | -d        | str       | Directory containing Commons SQL dump files.                     
-| --output-dir              | -o        | str       | Directory where downloaded images will be saved.                 
-| --workers                 | -w        | int       | Number of parallel download threads (default: 10).               
-| --recursive-search        |           | flag      | Disable recursive search for subcategories.                      
+|**Command**  | **Option**                | **Short** | **Type**  | **Description**                                                   
+|-------------|---------------------------|-----------|-----------|------------------------------------------------------------------
+|**fetch**    | --category-file           | -c        | str       | Path to the file containing desired categories (one per line).   
+|             | --dumps-dir               | -d        | str       | Directory containing Commons SQL dump files.                     
+|             | --recursive-search        |           | flag      | Enable recursive search for subcategories.                      
+|**download** | --category-file           | -c        | str       | Path to the file containing desired categories (one per line).   
+|             | --output-dir              | -o        | str       | Directory where downloaded images will be saved.                    
+|             | --workers                 | -w        | int       | Number of parallel download threads (default: 10). 
+|             | --recursive-search        |           | flag      | Enable recursive search for subcategories.
+|**run**      | --category-file           | -c        | str       | Path to the file containing desired categories (one per line).   
+|             | --dumps-dir               | -d        | str       | Directory containing Commons SQL dump files.     
+|             | --output-dir              | -o        | str       | Directory where downloaded images will be saved.          
+|             | --workers                 | -w        | int       | Number of parallel download threads (default: 10). 
+|             | --recursive-search        |           | flag      | Enable recursive search for subcategories.
+|**clean**    |                           |           |           | Clean program created files or folders (except downloads).
+
+## Example Usage
+Fetch titles
+```bash
+cwbd fetch -c categories.txt -d ./dumps --recursive-search
+```
+Download files
+```bash
+cwbd download -c categories.txt -o ./downloads -w 10 --recursive-search
+```
+Run (fetch & download internally)
+```bash
+cwbd run -c categories.txt -d ./dumps -o ./downloads -w 10 --recursive-search
+```
 
 
 ## Program Workflow  

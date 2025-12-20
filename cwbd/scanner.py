@@ -19,9 +19,8 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
 
   Args:
       infile (str): Path to the compressed '.sql.gz' dump file.
-      scanfile (str): File used to store resume/progress positions.
       outfile (str): Destination file to append extracted results.
-      save_interval (int): Number of lines between progress saves.
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
 
   Return:
       None
@@ -45,7 +44,6 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
 
   found_matches = count_lines_fast(outfile) # load from file
   if pctx.max_phase_matches and found_matches >= pctx.max_phase_matches:
-    print('Already found all matches')
     return
 
   lc = 0
@@ -104,6 +102,7 @@ def lt_handler(ctx : ProgramContext, match : tuple):
   Parse a row from the 'linktarget' dump.
 
   Args:
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
       match (tuple): Regex captured fields.
 
   Return:
@@ -136,6 +135,7 @@ def cl_handler(ctx : ProgramContext, match):
   Parse a row from the 'CategoryLinks' dump.
 
   Args:
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
       match (tuple): Regex captured fields.
 
   Return:
@@ -163,6 +163,7 @@ def page_handler(ctx : ProgramContext, match):
   Parse a row from the 'Pages' dump.
 
   Args:
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
       match (tuple): Regex captured fields.
 
   Return:

@@ -10,6 +10,19 @@ from .context import ProgramContext
 # TODO: ??? request amount of files in category through API
 
 def get_phase_max(dump_file : Path, ctx : ProgramContext):
+  """
+  Determine the maximum of matches to expect from a specific scan phase.
+
+  Args:
+      dump_file (Path): Path to the SQL dump file being processed.
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
+
+  Returns:
+    int: Maximum expected matches for this scan phase.
+
+  Notes:
+      - Used to set ctx.max_phase_matches when recursive search is disabled
+  """
   match dump_file:
     case _ if dump_file == ctx.linktarget_dump:
       return len(ctx.process_categories)
@@ -21,7 +34,19 @@ def get_phase_max(dump_file : Path, ctx : ProgramContext):
 
 
 def find_media_file_titles(ctx : ProgramContext):
+  """
+  Scan SQL dump files to find all media file titles associated with the input categories.
 
+  Args:
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
+
+  Returns:
+      None
+
+  Notes:
+      - Process linktarget, categorylinks and page dump files sequentially.
+      - Updates ctx.program_set after every phase completes.
+  """
   for dump_file, output_file in ctx.program_files.items():
     print(f'Processing: {dump_file}...')
 
@@ -37,6 +62,21 @@ def find_media_file_titles(ctx : ProgramContext):
 
 
 def retrace(ctx : ProgramContext):
+  """
+  Construct and ordered dictionary of media files mapped to their categories and page files.
+
+  Args:
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
+    
+  Retuns:
+    dict[str, dict]: Dictionary mapping category media titles to metadata, including:
+      - 'id': Linktarget ID
+      - 'n_files: Number of files found
+      - 'files': List of filenames belonging to the category
+  
+  Notes:
+      - Aggregates files per media title ina  structure suitable for JSON export.
+  """
   pfiles = ctx.program_files
   ordered_downloads = dict()
   lt_id_to_title = {}
@@ -79,6 +119,19 @@ def retrace(ctx : ProgramContext):
   return ordered_downloads
 
 def update_found_files(json_file : Path, data: dict):
+  """
+    Update the JSON file tracking discovered media files with new entries.
+
+    Args:
+        json_file (Path): Path to json file storing previously found files.
+        data (dict): Dictionary of newly found media files (output from retrace)
+
+    Returns:
+        None
+
+    Notes:
+        - Merges new files with existing entries, avoiding duplicates
+  """
   if json_file.exists():
     with json_file.open('r', encoding='utf-8') as f:
       existing = json.load(f)
@@ -106,6 +159,22 @@ def load_normalized_categories_from_file(infile : str):
     return set(normalize(norm_title) for norm_title in f.read().splitlines() if norm_title.strip())
 
 def main():
+  """
+  Main entry point for the Commonswiki Bulk Downloader CLI.
+
+  Workflow:
+      1. Parse CLI arguments.
+      2. Initialize ProgramContext with input categories, dump paths, output directory, and settings.
+      3. Determine which categories have not been processed yet.
+      4. Scan dump files to find media file titles for each category.
+      5. Update JSON tracking file with newly discovered files.
+      6. Download media files concurrently to the output directory.
+
+  Notes:
+      - Intended to be run via the `cwbd` console script or `python -m cwbd.main`.
+      - Supports incremental runs by skipping categories already processed.
+      - Uses ProgramContext to track progress, failed downloads, and maximum workers.
+  """
   args = get_cli_input()
 
   ctx = ProgramContext(
@@ -119,7 +188,7 @@ def main():
   ctx.process_categories = ctx.input_categories - set(get_json_data(ctx.found_files))
   if ctx.process_categories:
     find_media_file_titles(ctx)
-    update_found_files(ctx.found_files, retrace(ctx.program_files))
+    update_found_files(ctx.found_files, retrace(ctx))
 
   download_media_files(ctx)
 

@@ -31,14 +31,16 @@ def download_file(ctx : ProgramContext, file_title : str, outfolder : str):
   Skips download if the file already exists locally.
 
   Args:
+      ctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
       file_title (str): Exact wikimedia filename including extension.
+      outfolder (str): Folder path where the file should be saved.
 
   Return:
       None
 
   Notes:
-      - retries up to 5 times on network errors or non-200 reponses.
-      - uses stream download to handle lage images efficiently
+      - Uses stream download to handle lage images efficiently.
+      - Succesful downloads are tracked in ctx.downloads_set.
   """
   
   DOWNLOAD_HEADERS = {
@@ -72,7 +74,21 @@ def download_file(ctx : ProgramContext, file_title : str, outfolder : str):
 
 # def download_media_files(infile: str, categories: list[str], out : str, n_workers : int = 10):
 def download_media_files(pctx :ProgramContext):
+  """
+  Download all media files associated with the input categories in the program context.
 
+  Args:
+      pctx (ProgramContext): A class containing all settings, sets and filepaths for the program.
+
+  Returns:
+      None
+  
+  Notes: 
+      - Created output folders for each category automatically.
+      - Skips files that are already downloaded.
+      - Track failed downloads in a dedicated file pctx.invalid_files.
+      - Uses a ThreadPoolExecutor to perform paralell downloads based on pctx.max_workers.
+  """
   pctx.output_dir.mkdir(parents=True, exist_ok=True)
   
   try:

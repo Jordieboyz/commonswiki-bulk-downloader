@@ -4,6 +4,7 @@ from functools import partial
 
 from .download_utils import *
 from .context import ProgramContext
+from .progress import PhaseProgressMonitor
 
 def count_lines_fast(file) :
   try:
@@ -49,11 +50,16 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
   lc = 0
   
   if not end or start < end:
+    
+    tracker = PhaseProgressMonitor(outfile, db_entry)
+    
     with gzip.open(infile, 'rt', encoding='utf-8', errors='ignore') as inf,\
-      open(outfile, "a", encoding="utf-8") as outf:
+      open(outfile, "a", encoding="utf-8", errors='ignore') as outf:
 
       for line in inf:
         lc += 1
+        
+        tracker.current(lc)
 
         if f"INSERT INTO `{db_entry}`" not in line or lc < start:
           continue
@@ -69,14 +75,16 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
 
             found_matches += 1
             if pctx.max_phase_matches and found_matches >= pctx.max_phase_matches:
-                # save final linecount to prevent recalculation, since these are huge files. 
+              tracker.finish()
               return
+    tracker.finish()
   else:
     lc = start
 
   # save final linecount to prevent recalculation, since these are huge files. 
   save_position(scanfile, formatted_prog_str, lc)
   save_position(scanfile, formatted_size_str, lc)
+
 
 def extract_match(line : str, pp : dict):
   """
@@ -153,6 +161,9 @@ def cl_handler(ctx : ProgramContext, match):
   except ValueError:
     return None
   
+  if CONTROL_CHARS.search(sortkey):
+    return None
+  
   if type == 'file':
     if target_id in ctx.program_set:
       if not sortkey_prefix:
@@ -189,6 +200,8 @@ def page_handler(ctx : ProgramContext, match):
       
 
 
+
+CONTROL_CHARS = re.compile(r'[\x00-\x1F\x7F]')
 CATEGORYLINKS_REGEX = re.compile(
   r'\('
   r'(\d+),'                  # From           : int

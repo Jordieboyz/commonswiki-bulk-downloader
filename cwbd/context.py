@@ -33,7 +33,7 @@ class ProgramContext:
   
   pfiles : dict =  field(default_factory=dict)
 
-  save_interval : int = 100
+  save_interval : int = 300
   _max_workers : int = field(default_factory=int)
 
   _recursive_search : bool = field(default_factory=bool)

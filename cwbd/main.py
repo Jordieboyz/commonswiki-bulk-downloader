@@ -8,7 +8,6 @@ from .scanner import scan_commons_db
 from .download import download_media_files
 from .context import ProgramContext
 
-
 def get_phase_max(dump_file : Path, ctx : ProgramContext):
   """
   Determine the maximum of matches to expect from a specific scan phase.
@@ -49,8 +48,6 @@ def find_media_file_titles(ctx : ProgramContext):
       - Updates ctx.program_set after every phase completes.
   """
   for dump_file, output_file in ctx.program_files.items():
-    print(f'Processing: {dump_file}...')
-
     if not ctx.rsearch:
       ctx.max_phase_matches = get_phase_max(dump_file, ctx)
     
@@ -82,16 +79,10 @@ def retrace(ctx : ProgramContext):
   ordered_downloads = dict()
   lt_id_to_title = {}
   
-  with open(pfiles[ctx.linktarget_dump], 'r') as link:
+  with open(pfiles[ctx.linktarget_dump], 'r', encoding='utf-8') as link:
     for line in link:
       id, title = line.rstrip('\n').split('\t', 1)
       lt_id_to_title[int(id)] = title
-
-      ordered_downloads[title] = {
-        'id' : int(id),
-        'n_files' : 0,
-        'files' : [],
-      }
 
   page_id_to_file = {}
   with open(pfiles[ctx.page_dump], 'r', encoding='utf-8') as page:
@@ -101,6 +92,7 @@ def retrace(ctx : ProgramContext):
 
   with open(pfiles[ctx.category_dump], 'r', encoding='utf-8') as cl:
     for line in cl:
+
       id, _, tid = line.split('\t')
       
       id = int(id)
@@ -113,6 +105,13 @@ def retrace(ctx : ProgramContext):
       if not title:
         continue
       
+      if title not in ordered_downloads:
+        ordered_downloads[title] = {
+          'id' : int(id),
+          'n_files' : 0,
+          'files' : [],
+        }
+
       entry = ordered_downloads[title]
       entry['files'].append(page_id_to_file[id])
       entry['n_files'] += 1

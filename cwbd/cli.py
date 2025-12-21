@@ -55,8 +55,6 @@ def get_cli_input():
   run.add_argument("--workers", "-w", type=int, default=10, help="Number of parallel downloads")
   run.add_argument("--recursive-search", action='store_true', help="Recursively scan subcategories")
 
-
-
   # -------------------------------------------------------------------
   # Fetch
   # -------------------------------------------------------------------
@@ -65,14 +63,9 @@ def get_cli_input():
     help="Scan SQL dumps and build media index"
   )
 
-  fetch.add_argument("--category-file","-c", type=str,  required=True, 
-                      help="File that holds the desired categories" )
-  
-  fetch.add_argument("--dumps-dir",    "-d", type=str,  required=True, 
-                      help="Directory containing Commons SQL dump files")
-  
-  fetch.add_argument("--recursive-search", action='store_true',  
-                      help="Prevent program to recursively obtain all media files in subcategories")
+  fetch.add_argument("--category-file","-c", type=str,  required=True, help="File that holds the desired categories" )
+  fetch.add_argument("--dumps-dir",    "-d", type=str,  required=True, help="Directory containing Commons SQL dump files")
+  fetch.add_argument("--recursive-search", action='store_true', help="Prevent program to recursively obtain all media files in subcategories")
 
   # -------------------------------------------------------------------
   # Download
@@ -82,23 +75,14 @@ def get_cli_input():
     help="Download media files from previously fetched index"
   )
 
-  download.add_argument("--category-file","-c", type=str,  required=True, 
-                        help="File that holds the desired categories" )
-
-  download.add_argument("--output-dir",   "-o", type=str,  required=True, 
-                      help="Directory to store downloaded images")
+  download.add_argument("--category-file","-c", type=str,  required=True, help="File that holds the desired categories" )
+  download.add_argument("--output-dir",   "-o", type=str,  required=True, help="Directory to store downloaded images")
+  download.add_argument("--workers",      "-w", type=int,  default=10,    help="Number of parallel download threads")
+  download.add_argument("--recursive-search", action='store_true',      help="Prevent program to recursively obtain all media files in subcategories")
   
-  download.add_argument("--workers",      "-w", type=int,  default=10,    
-                      help="Number of parallel download threads")
-  
-  download.add_argument("--recursive-search", action='store_true',  
-                    help="Prevent program to recursively obtain all media files in subcategories")
-  
-
-
   args = parser.parse_args()
 
-  if args.command is None:
+  if args.command is None or args.command not in ("clean", "fetch", "download", "run"):
     parser.print_help()
     sys.exit(1)
 

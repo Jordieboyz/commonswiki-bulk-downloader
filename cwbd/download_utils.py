@@ -153,7 +153,6 @@ def get_set(input_file : str, idx : bool = 0, sep='\t'):
         title = str(columns[1])
         tid = int(columns[2]) if len(columns) >= 3 else None
       except ValueError:
-        print('value error???')
         continue
 
       match idx:

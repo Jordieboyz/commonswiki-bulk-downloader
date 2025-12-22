@@ -114,10 +114,18 @@ def download_media_files(pctx :ProgramContext):
     n_files = sum(int(entry['n_files']) for entry in file_category_titles_dict.values())
     save_position(pctx.progress_scanner, fformat('download', 'size', sep=':'), n_files)
 
-
+   # TODO: check in progression fril which categories we have had to prevent a lot of calls to single file existences.
   for category, subfields in file_category_titles_dict.items():
-    if not any(category == c for c in pctx.categories):
+    if category in get_progress_dl_categories(pctx.progress_scanner):
       continue
+
+    # Add recusive-search for easy download of all files found
+    if pctx.rsearch:
+      if not any(category.startswith(c) for c in pctx.categories):
+        continue
+    else:
+      if not any(category == c for c in pctx.categories):
+        continue
 
     if not (files := subfields.get("files", [])):
       continue
@@ -138,6 +146,8 @@ def download_media_files(pctx :ProgramContext):
 
 
     try:
+      # if we quit during the processing of a category, the next time we run, it will append the progress from the category... 
+      # TODO: multithread fiel writing is unsafe, but is the solution to track the amount of donwloaded files instead of whole categories...
       with open(pctx.downloaded_files, 'a', encoding='utf-8') as Wdownloads, \
         open(pctx.invalid_files, 'a', encoding='utf-8') as Ldownloads:
         

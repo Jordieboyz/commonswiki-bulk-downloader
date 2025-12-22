@@ -174,3 +174,26 @@ def count_newlines_mmap(infile):
         return mm[:].count(b"\n")
   except:
     return 0
+  
+def get_progress_dl_categories(progress_file, phase_str  : str = 'download'):
+  categories = set()
+  try:
+    with progress_file.open('r', encoding='utf-8') as prog:
+      for line in prog:
+        if '=' not in line or not line.startswith(phase_str):
+          continue
+
+        key, value = line.split('=', 1)
+        key_split = key.split(':')
+        if len(key_split) < 3:
+          continue
+        
+        phase, cat, _ = key_split
+        if not cat:
+          continue
+
+        categories.add(cat)
+  except:
+    pass
+  return categories
+

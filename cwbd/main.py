@@ -229,30 +229,14 @@ def print_program_status():
       formatted_size_str = fformat(phase_str, 'size', sep=':')
       total_end = load_position(ctx.progress_scanner, formatted_size_str)
 
+      read_lines = 0
       if (parser := get_parser(phase_str)):
         formatted_prog_str = fformat(phase_str, parser['handler'].func.__name__, ctx.save_interval, sep=':')
         read_lines = load_position(ctx.progress_scanner, formatted_prog_str)
       else:
           PHASE_TOTALS[phase_str] = total_end
-          read_lines = 0
-          try:
-            with ctx.progress_scanner.open('r', encoding='utf-8') as prog:
-              for line in prog:
-                if '=' not in line or not line.startswith(phase_str):
-                  continue
-
-                key, value = line.split('=', 1)
-                key_split = key.split(':')
-                if len(key_split) < 3:
-                  continue
-                
-                phase, cat, _ = key_split
-                if not cat:
-                  continue
-
-                read_lines += int(value)
-          except:
-            pass
+          for c in  get_progress_dl_categories(ctx.progress_scanner):
+            read_lines += int(load_position(ctx.progress_scanner, fformat(phase_str, c, 'size', sep=':')))
 
       found_matches = count_newlines_mmap(output_file)
 
@@ -321,6 +305,7 @@ def main():
         output_dir=Path(args.output_dir),
         input_categories=load_normalized_categories_from_file(args.category_file),
         max_workers=args.workers,
+        recursive_search=args.recursive_search
       )
           
       download_media_files(pctx)

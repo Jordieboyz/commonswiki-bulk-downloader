@@ -82,11 +82,12 @@ class ProgramContext:
     return ctx
   
   @classmethod
-  def init_download(cls, *, output_dir : Path, input_categories : set[str], max_workers : int):
+  def init_download(cls, *, output_dir : Path, input_categories : set[str], max_workers : int, recursive_search : bool):
     return ProgramContext(
       _output_dir=output_dir,
       _input_categories=input_categories,
-      _max_workers=max_workers
+      _max_workers=max_workers,
+      _recursive_search=recursive_search,
      )
 
   @classmethod

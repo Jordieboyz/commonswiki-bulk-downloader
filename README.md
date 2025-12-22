@@ -51,7 +51,6 @@ cwbd <command> [options]
 |**download** | --category-file           | -c        | str       | Path to the file containing desired categories (one per line).   
 |             | --output-dir              | -o        | str       | Directory where downloaded images will be saved.                    
 |             | --workers                 | -w        | int       | Number of parallel download threads (default: 10). 
-|             | --recursive-search        |           | flag      | Enable recursive search for subcategories.
 |**run**      | --category-file           | -c        | str       | Path to the file containing desired categories (one per line).   
 |             | --dumps-dir               | -d        | str       | Directory containing Commons SQL dump files.     
 |             | --output-dir              | -o        | str       | Directory where downloaded images will be saved.          

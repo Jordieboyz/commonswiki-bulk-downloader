@@ -78,7 +78,6 @@ def get_cli_input():
   download.add_argument("--category-file","-c", type=str,  required=True, help="File that holds the desired categories" )
   download.add_argument("--output-dir",   "-o", type=str,  required=True, help="Directory to store downloaded images")
   download.add_argument("--workers",      "-w", type=int,  default=10,    help="Number of parallel download threads")
-  download.add_argument("--recursive-search", action='store_true',      help="Prevent program to recursively obtain all media files in subcategories")
   
   args = parser.parse_args()
 

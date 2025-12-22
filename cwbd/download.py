@@ -5,6 +5,7 @@ import requests
 
 from .context import ProgramContext
 from .download_utils import get_json_data
+from .progress import PhaseProgressMonitor
 
 def collect_existing_filenames(folders : list[str]):
   """
@@ -25,7 +26,7 @@ def collect_existing_filenames(folders : list[str]):
   return filenames
 
 
-def download_file(ctx : ProgramContext, file_title : str, outfolder : str):
+def download_file(ctx : ProgramContext, file_title : str, outfolder : str, tracker : PhaseProgressMonitor):
   """
   Download a wikimedia commons file via Special:FilePath and save it to the ../imgs directory.
   Skips download if the file already exists locally.
@@ -66,10 +67,14 @@ def download_file(ctx : ProgramContext, file_title : str, outfolder : str):
           f.write(chunk)
 
       ctx.downloads_set.add(file_title)
-      print(f"[SUCCES] Downloaded: {file_title}")
+      # print(f"[SUCCES] Downloaded: {file_title}")
   except Exception as e:
     ctx.failed_downloads_set.add(file_title)
-    print(f"[ERROR] Failed to download {file_title} : {e}")
+    # print(f"[ERROR] Failed to download {file_title} : {e}")
+  finally:
+    if tracker:
+      tracker._current += 1
+      tracker._matches += 1
 
 
 # def download_media_files(infile: str, categories: list[str], out : str, n_workers : int = 10):
@@ -104,7 +109,7 @@ def download_media_files(pctx :ProgramContext):
     print('No downloadable files found!')
     print('Make sure to run \'cwbd fetch <arguments>\' first!')
     return
-  
+
   for category, subfields in file_category_titles_dict.items():
     if not any(category == c for c in pctx.categories):
       continue
@@ -112,12 +117,16 @@ def download_media_files(pctx :ProgramContext):
     if not (files := subfields.get("files", [])):
       continue
     
+    tracker = PhaseProgressMonitor(subfields.get("n_files", 0), category)
+
     out_folder = os.path.join(pctx.output_dir, category.replace('_', ' '))
     os.makedirs(out_folder, exist_ok=True)
 
     with ThreadPoolExecutor(max_workers=pctx.max_workers) as executor:
-      executor.map(download_file, repeat(pctx), files, repeat(out_folder))
+      executor.map(download_file, repeat(pctx), files, repeat(out_folder), repeat(tracker))
     
+    tracker.finish()
+
     # write failed downloads after category completed
     with open(pctx.invalid_files, 'a') as f:
       for item in pctx.failed_downloads_set:

@@ -1,5 +1,6 @@
 import os
 import json
+import mmap
 
 class WikiNamespace():
   """
@@ -163,3 +164,12 @@ def get_set(input_file : str, idx : bool = 0, sep='\t'):
         case 2: 
           data.add(tid)
   return data
+
+
+def count_newlines_mmap(self):
+  try:
+    with open(self.progress_file , "rb") as f:
+      with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+        return mm[:].count(b"\n")
+  except:
+    return 0

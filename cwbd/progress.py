@@ -1,23 +1,14 @@
 import time
 import sys
-import os
 import mmap
 import threading
 
-# Per dumps file @ 8-dec-2025
-# Might need to change these based on your version to get accuracte readings
-PHASE_TOTALS = {
-  "linktarget": 6440,
-  "categorylinks": 123406,
-  "page": 24450,
-}
-
 class PhaseProgressMonitor(threading.Thread):
-  def __init__(self, progress_file, phase):
+  def __init__(self, total, phase, progress_file = None):
     super().__init__(daemon=True)
 
     self.progress_file = progress_file
-    self.total = PHASE_TOTALS[phase]
+    self.total = total
 
     self.start_time = time.time()
     
@@ -39,21 +30,16 @@ class PhaseProgressMonitor(threading.Thread):
     while not self._stop:
       now = time.time()
 
-      if now - self.last_matches_update >= self.match_interval:
+      if self.progress_file and now - self.last_matches_update >= self.match_interval:
         self._matches = self.count_newlines_mmap()
         self.last_matches_update = now
 
-      if now - self.last_update >= self.update_interval:
-        self.update()
-        self.last_update = now
+      if self._current or self._matches:
+        if now - self.last_update >= self.update_interval:
+          self.update()
+          self.last_update = now
 
       time.sleep(0.05)
-
-  def set_phase(self, phase):
-    self.phase = phase
-
-  def current(self, current):
-    self._current = current
 
   def _start(self):
     sys.stdout.write(f"\n[INFO] Phase '{self.phase}' Started!\n")
@@ -98,6 +84,7 @@ class PhaseProgressMonitor(threading.Thread):
 
 
   def finish(self):
+    self.update()
     self._stop = True
     self.join()
     sys.stdout.write(f"[INFO] Phase '{self.phase}' Completed!\n")

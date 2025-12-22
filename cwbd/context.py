@@ -33,7 +33,7 @@ class ProgramContext:
   
   pfiles : dict =  field(default_factory=dict)
 
-  save_interval : int = 300
+  save_interval : int = 200
   _max_workers : int = field(default_factory=int)
 
   _recursive_search : bool = field(default_factory=bool)
@@ -81,12 +81,10 @@ class ProgramContext:
     return ctx
   
   @classmethod
-  def init_download(cls, *, output_dir : Path, input_categories : set[str], 
-                    recursive_search : bool, max_workers : int):
+  def init_download(cls, *, output_dir : Path, input_categories : set[str], max_workers : int):
     return ProgramContext(
       _output_dir=output_dir,
       _input_categories=input_categories,
-      _recursive_search=recursive_search,
       _max_workers=max_workers
      )
 

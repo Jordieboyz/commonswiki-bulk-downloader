@@ -224,26 +224,25 @@ def main():
     case 'clean':
       clean_program_files()
     case 'fetch':
-      ctx = ProgramContext.init_fetch(
+      pctx = ProgramContext.init_fetch(
         dumps_dir=Path(args.dumps_dir),
         input_categories=load_normalized_categories_from_file(args.category_file),
         recursive_search=args.recursive_search
       )
 
-      ctx.process_categories = ctx.categories - set(get_json_data(ctx.found_files))
-      if ctx.process_categories:
-        find_media_file_titles(ctx)
-        update_found_files(ctx.found_files, retrace(ctx))
+      pctx.process_categories = pctx.categories - set(get_json_data(pctx.found_files))
+      if pctx.process_categories:
+        find_media_file_titles(pctx)
+        update_found_files(pctx.found_files, retrace(pctx))
     
     case 'download':
-      ctx = ProgramContext.init_download(
+      pctx = ProgramContext.init_download(
         output_dir=Path(args.output_dir),
         input_categories=load_normalized_categories_from_file(args.category_file),
-        recursive_search=args.recursive_search,
         max_workers=args.workers,
       )
           
-      download_media_files(ctx)
+      download_media_files(pctx)
 
     case 'run':
       pctx = ProgramContext.init_run(

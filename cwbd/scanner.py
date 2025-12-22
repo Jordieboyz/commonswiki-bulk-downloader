@@ -6,12 +6,13 @@ from .download_utils import *
 from .context import ProgramContext
 from .progress import PhaseProgressMonitor
 
-def count_lines_fast(file) :
-  try:
-    with open(file, 'rb') as f:
-      return sum(chunk.count(b'\n') for chunk in iter(lambda: f.read(1024 * 1024), b''))
-  except FileNotFoundError:
-    return 0
+# Per dumps file @ 8-dec-2025
+# Might need to change these based on your version to get accuracte readings
+PHASE_TOTALS = {
+  "linktarget": 6440,
+  "categorylinks": 123406,
+  "page": 24450,
+}
     
 def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
   """
@@ -43,7 +44,7 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
   start = load_position(scanfile, formatted_prog_str)
   end = load_position(scanfile, formatted_size_str)
 
-  found_matches = count_lines_fast(outfile) # load from file
+  found_matches = count_newlines_mmap(outfile) # load from file
   if pctx.max_phase_matches and found_matches >= pctx.max_phase_matches:
     return
 
@@ -51,15 +52,14 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
   
   if not end or start < end:
     
-    tracker = PhaseProgressMonitor(outfile, db_entry)
+    tracker = PhaseProgressMonitor(PHASE_TOTALS[db_entry], db_entry, outfile)
     
     with gzip.open(infile, 'rt', encoding='utf-8', errors='ignore') as inf,\
       open(outfile, "a", encoding="utf-8", errors='ignore') as outf:
 
       for line in inf:
         lc += 1
-        
-        tracker.current(lc)
+        tracker._current = lc
 
         if f"INSERT INTO `{db_entry}`" not in line or lc < start:
           continue

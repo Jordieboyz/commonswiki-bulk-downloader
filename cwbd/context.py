@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .download_utils import get_json_data
+from .cwbd_utils import get_json_data
 
 @dataclass
 class ProgramContext:
@@ -41,6 +41,7 @@ class ProgramContext:
 
   found_files : Path = field(init=False)
   invalid_files : Path = field(init=False)
+  downloaded_files : Path = field(init=False)
 
   downloads_set : set = field(default_factory=set)
   failed_downloads_set : set = field(default_factory=set)
@@ -63,9 +64,9 @@ class ProgramContext:
     # setup for download system
     self.found_files = Path('Categorized_file_titles.json')
     self.invalid_files = self.checkpoint_dir / 'invalid.txt'
+    self.downloaded_files = self.checkpoint_dir / 'downloads.txt'
 
-    # self.reset_scanner()
-  
+
   @classmethod
   def init_run(cls, *, dumps_dir : Path, output_dir : Path, input_categories : set[str], 
                     recursive_search : bool, max_workers : int):
@@ -77,7 +78,7 @@ class ProgramContext:
       _max_workers=max_workers,
     )
 
-    ctx.__init_dump_files()
+    ctx._init_dump_files()
     return ctx
   
   @classmethod
@@ -96,10 +97,10 @@ class ProgramContext:
       _recursive_search=recursive_search
      )
 
-    ctx.__init_dump_files()
+    ctx._init_dump_files()
     return ctx
 
-  def __init_dump_files(self):
+  def _init_dump_files(self):
     if not self._dump_dir:
       raise ValueError("dump_dir must be provided for fetch")
      

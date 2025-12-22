@@ -2,7 +2,7 @@ import gzip
 import re
 from functools import partial
 
-from .download_utils import *
+from .cwbd_utils import *
 from .context import ProgramContext
 from .progress import PhaseProgressMonitor
 
@@ -38,8 +38,8 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
   scanfile = pctx.progress_scanner
 
   # if use_checkpoints:
-  formatted_prog_str = fformat(infile, parser['handler'].func.__name__, pctx.save_interval, sep=':')
-  formatted_size_str = fformat(infile, 'size', sep=':')
+  formatted_prog_str = fformat(db_entry, parser['handler'].func.__name__, pctx.save_interval, sep=':')
+  formatted_size_str = fformat(db_entry, 'size', sep=':')
     
   start = load_position(scanfile, formatted_prog_str)
   end = load_position(scanfile, formatted_size_str)
@@ -231,7 +231,7 @@ LINKTARGET_REGEX =  re.compile(
   r'\)'
 )
 
-def get_parser(id_str : str, ctx : ProgramContext):
+def get_parser(id_str : str, ctx : ProgramContext = None):
   match id_str:
     case 'linktarget': 
       return {

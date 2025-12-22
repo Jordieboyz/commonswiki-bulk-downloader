@@ -4,8 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 
 from .context import ProgramContext
-from .download_utils import get_json_data
 from .progress import PhaseProgressMonitor
+from .cwbd_utils import *
 
 def collect_existing_filenames(folders : list[str]):
   """
@@ -97,18 +97,23 @@ def download_media_files(pctx :ProgramContext):
   pctx.output_dir.mkdir(parents=True, exist_ok=True)
   
   try:
-    with open(pctx.invalid_files, 'r+') as f:
-      pctx.failed_downloads_set = set(f.read().splitlines())
-  except FileNotFoundError:
-    open(pctx.invalid_files, 'w').close()
+    with open(pctx.downloaded_files, 'r', encoding='utf-8') as downloads:
+      pctx.downloads_set = set(downloads.read().splitlines())
 
-  pctx.downloads_set = collect_existing_filenames([pctx.output_dir])
-  
+    with open(pctx.invalid_files, 'r', encoding='utf-8') as invalid_downloads:
+      pctx.failed_downloads_set = set(invalid_downloads.read().splitlines())
+  except FileNotFoundError:
+    pass
+
   file_category_titles_dict = get_json_data(pctx.found_files)
   if not file_category_titles_dict:
     print('No downloadable files found!')
     print('Make sure to run \'cwbd fetch <arguments>\' first!')
     return
+  else:
+    n_files = sum(int(entry['n_files']) for entry in file_category_titles_dict.values())
+    save_position(pctx.progress_scanner, fformat('download', 'size', sep=':'), n_files)
+
 
   for category, subfields in file_category_titles_dict.items():
     if not any(category == c for c in pctx.categories):
@@ -116,19 +121,37 @@ def download_media_files(pctx :ProgramContext):
 
     if not (files := subfields.get("files", [])):
       continue
+      
+    cat_n_files = subfields.get("n_files", 0)
     
-    tracker = PhaseProgressMonitor(subfields.get("n_files", 0), category)
 
-    out_folder = os.path.join(pctx.output_dir, category.replace('_', ' '))
+    tracker = PhaseProgressMonitor(cat_n_files, category)
+
+    out_folder = os.path.join(pctx.output_dir, category)
     os.makedirs(out_folder, exist_ok=True)
 
     with ThreadPoolExecutor(max_workers=pctx.max_workers) as executor:
       executor.map(download_file, repeat(pctx), files, repeat(out_folder), repeat(tracker))
-    
-    tracker.finish()
 
-    # write failed downloads after category completed
-    with open(pctx.invalid_files, 'a') as f:
-      for item in pctx.failed_downloads_set:
-        f.write(item + '\n')
-      f.flush()
+    tracker.finish()
+    save_position(pctx.progress_scanner, fformat('download', category, 'size', sep=':'), cat_n_files)
+
+
+    try:
+      with open(pctx.downloaded_files, 'a', encoding='utf-8') as Wdownloads, \
+        open(pctx.invalid_files, 'a', encoding='utf-8') as Ldownloads:
+        
+        # write succesful downloads after category completed
+        for item in pctx.downloads_set:
+          Wdownloads.write(item + '\n')
+        Wdownloads.flush()
+
+        # write failed downloads after category completed
+        for item in pctx.failed_downloads_set:
+          Ldownloads.write(item + '\n')
+        Ldownloads.flush()
+
+    except Exception as e:
+      print(e)
+      pass
+

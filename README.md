@@ -56,6 +56,7 @@ cwbd <command> [options]
 |             | --output-dir              | -o        | str       | Directory where downloaded images will be saved.          
 |             | --workers                 | -w        | int       | Number of parallel download threads (default: 10). 
 |             | --recursive-search        |           | flag      | Enable recursive search for subcategories.
+|**status**   |                           |           |           | Get status information about the different phases.
 |**clean**    |                           |           |           | Clean program created files or folders (except downloads).
 
 ## Example Usage

@@ -65,7 +65,8 @@ def load_position(scanner_file : str, dump_file : str):
         key, value = line.split('=', 1)
         if key.strip() == dump_file:
           return int(value.strip())
-  except:
+  except Exception as e:
+    print(e)
     return 0
   return 0
 
@@ -166,9 +167,9 @@ def get_set(input_file : str, idx : bool = 0, sep='\t'):
   return data
 
 
-def count_newlines_mmap(self):
+def count_newlines_mmap(infile):
   try:
-    with open(self.progress_file , "rb") as f:
+    with open(infile , "rb") as f:
       with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
         return mm[:].count(b"\n")
   except:

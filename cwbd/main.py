@@ -3,10 +3,11 @@ import shutil
 from pathlib import Path
 
 from .cli import get_cli_input
-from .download_utils import *
-from .scanner import scan_commons_db
+from .cwbd_utils import *
+from .scanner import scan_commons_db, get_parser, PHASE_TOTALS
 from .download import download_media_files
 from .context import ProgramContext
+
 
 def get_phase_max(dump_file : Path, ctx : ProgramContext):
   """
@@ -201,6 +202,84 @@ def clean_program_files():
       shutil.rmtree(pycache, ignore_errors=True)
 
 
+def print_program_status():
+  ctx = ProgramContext()
+
+  status_lines = []
+  status_lines.append('Commonswiki Bulk Donwloader - status\n')
+
+  phases = {
+    'linktarget' : 1,  
+    'categorylinks' : 2,  
+    'page' : 3, 
+    'download' : 4, 
+  }
+
+  output_files = os.listdir(ctx.checkpoint_dir)
+
+  # enforce order of phases and retrieve output files for matches found
+  for file in output_files:
+    for phase, _ in phases.items():
+      if file.startswith(phase):
+        phases[phase] = file        
+        break
+  
+  for phase_no, (phase_str, output_file) in enumerate(phases.items(), start=1):
+            
+      formatted_size_str = fformat(phase_str, 'size', sep=':')
+      total_end = load_position(ctx.progress_scanner, formatted_size_str)
+
+      if (parser := get_parser(phase_str)):
+        formatted_prog_str = fformat(phase_str, parser['handler'].func.__name__, ctx.save_interval, sep=':')
+        read_lines = load_position(ctx.progress_scanner, formatted_prog_str)
+      else:
+          PHASE_TOTALS[phase_str] = total_end
+          read_lines = 0
+          try:
+            with ctx.progress_scanner.open('r', encoding='utf-8') as prog:
+              for line in prog:
+                if '=' not in line or not line.startswith(phase_str):
+                  continue
+
+                key, value = line.split('=', 1)
+                key_split = key.split(':')
+                if len(key_split) < 3:
+                  continue
+                
+                phase, cat, _ = key_split
+                if not cat:
+                  continue
+
+                read_lines += int(value)
+          except:
+            pass
+
+      found_matches = count_newlines_mmap(output_file)
+
+      if total_end and read_lines >= total_end:
+        state = "completed"
+      elif read_lines > 0:
+        state = "in progress"
+      else:
+        state = "initialized"
+
+      if read_lines > 0:
+        progress = f"{read_lines:,} / {PHASE_TOTALS[phase_str]:,} lines"
+      else:
+        progress = f"{read_lines:,} lines read"
+
+      status_lines.append(f"{phase_no}. {phase_str.capitalize():<16}: {state}")
+      status_lines.append(f"    Input progress : {progress}")
+      status_lines.append(f"    Matches  found : {found_matches}")
+      status_lines.append("")
+      
+  if len(status_lines) < 2:
+    status_lines.append("No scan progress found.")
+    status_lines.append("Run `cwbd fetch` or `cwbd run` to begin scanning.")
+
+  print('\n'.join(status_lines))
+    
+
 def main():
   """
   Main entry point for the Commonswiki Bulk Downloader CLI.
@@ -223,6 +302,8 @@ def main():
   match args.command:
     case 'clean':
       clean_program_files()
+    case 'status':
+      print_program_status()
     case 'fetch':
       pctx = ProgramContext.init_fetch(
         dumps_dir=Path(args.dumps_dir),

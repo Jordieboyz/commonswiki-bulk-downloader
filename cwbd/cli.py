@@ -41,6 +41,11 @@ def get_cli_input():
     help="Remove generated folders and files used during fetch or download phase."
   )
 
+  subparsers.add_parser(
+    "status",
+    help="Print some status information about the state of the different phases."
+  )
+
   # -------------------------------------------------------------------
   # Run
   # -------------------------------------------------------------------
@@ -81,7 +86,7 @@ def get_cli_input():
   
   args = parser.parse_args()
 
-  if args.command is None or args.command not in ("clean", "fetch", "download", "run"):
+  if args.command is None or args.command not in ("clean", "fetch", "download", "run", "status"):
     parser.print_help()
     sys.exit(1)
 

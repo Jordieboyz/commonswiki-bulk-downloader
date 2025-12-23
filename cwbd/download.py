@@ -28,11 +28,6 @@ def download_file(session : requests.Session, out_dir : Path, file_title : str):
 
   try:
     r = session.get(url, stream=True, timeout=20)
-    if r.status_code == 429:
-      print('got found 429')
-      
-      return file_title, False
-        
     if r.status_code != 200:
       return file_title, False
 

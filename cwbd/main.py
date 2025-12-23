@@ -8,7 +8,6 @@ from .scanner import scan_commons_db, get_parser, PHASE_TOTALS
 from .download import download_media_files
 from .context import ProgramContext
 
-
 def get_phase_max(dump_file : Path, ctx : ProgramContext):
   """
   Determine the maximum of matches to expect from a specific scan phase.
@@ -251,10 +250,10 @@ def print_program_status():
       else:
         state = "initialized"
 
-      if read_lines > 0:
-        progress = f"{read_lines:,} \t/ {PHASE_TOTALS[phase_str]:,} lines"
-      else:
-        progress = f"{read_lines:,} lines read"
+      # if read_lines > 0:
+      progress = f"{read_lines:,}  \t/ {PHASE_TOTALS[phase_str]:,} lines"
+      # else:
+        # progress = f"{read_lines:,} lines read"
 
       status_lines.append(f"{phase_no}. {phase_str.capitalize():<16}: {state}")
       status_lines.append(f"    Input progress : {progress}")

@@ -185,10 +185,10 @@ def get_progress_dl_categories(progress_file, phase_str  : str = 'download'):
 
         key, value = line.split('=', 1)
         key_split = key.split(':')
-        if len(key_split) < 3:
+        if len(key_split) > 2:
           continue
         
-        phase, cat, _ = key_split
+        phase, cat = key_split
         if not cat:
           continue
 

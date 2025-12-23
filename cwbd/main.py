@@ -209,14 +209,13 @@ def print_program_status():
   status_lines.append('Commonswiki Bulk Donwloader - status\n')
 
   phases = {
-    'linktarget' : 1,  
-    'categorylinks' : 2,  
-    'page' : 3, 
-    'download' : 4, 
+    'linktarget' : None,  
+    'categorylinks' : None,  
+    'page' : None, 
+    'download' : None, 
   }
 
   output_files = os.listdir(ctx.checkpoint_dir)
-  n_categories = len(get_json_data(ctx.found_files)) # computational heavy, watch this one carefully.
 
   # enforce order of phases and retrieve output files for matches found
   for file in output_files:
@@ -226,8 +225,7 @@ def print_program_status():
         break
   
   for phase_no, (phase_str, output_file) in enumerate(phases.items(), start=1):
-            
-      formatted_size_str = fformat(phase_str, 'size', sep=':')
+      formatted_size_str = fformat(phase_str, sep=':')
       total_end = load_position(ctx.progress_scanner, formatted_size_str)
 
       read_lines = 0
@@ -235,11 +233,16 @@ def print_program_status():
         formatted_prog_str = fformat(phase_str, parser['handler'].func.__name__, ctx.save_interval, sep=':')
         read_lines = load_position(ctx.progress_scanner, formatted_prog_str)
       else:
-          PHASE_TOTALS[phase_str] = total_end
+          PHASE_TOTALS[phase_str] = load_position(ctx.progress_scanner, fformat(phase_str, 'files', 'total', sep=':'))
+          n_categories = load_position(ctx.progress_scanner, fformat(phase_str, 'categories', 'total', sep=':'))
+          
           progress_categories = get_progress_dl_categories(ctx.progress_scanner)
           read_lines = sum([size for (c, size) in progress_categories])
 
-      found_matches = count_newlines_mmap(ctx.checkpoint_dir / output_file)
+      if output_file:
+        found_matches = count_newlines_mmap(ctx.checkpoint_dir / output_file)
+      else:
+        found_matches = 0
 
       if total_end and read_lines >= total_end:
         state = "completed"
@@ -255,8 +258,11 @@ def print_program_status():
 
       status_lines.append(f"{phase_no}. {phase_str.capitalize():<16}: {state}")
       status_lines.append(f"    Input progress : {progress}")
+      
+
       if phase_str == 'download':
         status_lines.append(f"                   : {f"{len(progress_categories):,}  \t/ {n_categories:,} categories"}")
+
       status_lines.append(f"    Matches  found : {found_matches:,}")
       status_lines.append("")
       

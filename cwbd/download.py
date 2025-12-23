@@ -1,36 +1,12 @@
-import os
-from itertools import repeat
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from pathlib import Path
-from queue import Queue
-import threading
 
 from .context import ProgramContext
 from .progress import PhaseProgressMonitor
 from .cwbd_utils import *
 
-def collect_existing_filenames(folders : list[str]):
-  """
-  Walks through folder to find all filenames of downloaded images.
-
-  Args:
-      folders (list[str]): Folder to search for file titles that already have been downloaded.
-
-  Return:
-      list[str]: All filenames of downloaded images.
-  """
-  filenames = set()
-
-  for folder in folders:
-    for root, dirs, files in os.walk(folder):
-      for f in files:
-        filenames.add(f)
-  return filenames
-
-
-def download_file(ctx : ProgramContext, file_title : str, category : str, tracker : PhaseProgressMonitor, 
-                  log_queue : Queue, dl_queue : Queue):
+def download_file(session : requests.Session, out_dir : Path, file_title : str):
   """
   Download a wikimedia commons file via Special:FilePath and save it to the ../imgs directory.
   Skips download if the file already exists locally.
@@ -47,74 +23,30 @@ def download_file(ctx : ProgramContext, file_title : str, category : str, tracke
       - Uses stream download to handle lage images efficiently.
       - Succesful downloads are tracked in ctx.downloads_set.
   """
-  
-  DOWNLOAD_HEADERS = {
-    "User-Agent": "user@gmail.com",
-    "Referer": "https://commons.wikimedia.org/"
-  }
-
-  # prevent double processing
-  if file_title in ctx.failed_downloads_set:
-    return
-
-  if file_title in ctx.downloads_set:
-    return
-
   url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_title}"
-  
-  out_folder = os.path.join(ctx.output_dir, category)
-  os.makedirs(out_folder, exist_ok=True)
-
-  out_path = os.path.join(out_folder, file_title)
+  out_path = out_dir / file_title
 
   try:
-    r = requests.get(url, stream=True, timeout=20, headers=DOWNLOAD_HEADERS)
-    if r.status_code == 200:
-      with open(out_path, "wb") as f:
-        for chunk in r.iter_content(1024*1024):
-          f.write(chunk)
+    r = session.get(url, stream=True, timeout=20)
+    if r.status_code == 429:
+      print('got found 429')
+      
+      return file_title, False
+        
+    if r.status_code != 200:
+      return file_title, False
 
-      ctx.downloads_set.add(file_title)
-      dl_queue.put(file_title)
+    with open(out_path, "wb") as f:
+      for chunk in r.iter_content(2 * 1024 * 1024):
+        f.write(chunk)
 
-      # print(f"[SUCCES] Downloaded: {file_title}")
+    return file_title, True
+
   except Exception as e:
-    ctx.failed_downloads_set.add(file_title)
-    # print(f"[ERROR] Failed to download {file_title} : {e}")
-  finally:
-    if tracker:
-      tracker._current += 1
-      tracker._matches += 1
-    log_queue.put((category, tracker._current))
+    return file_title, False
 
-def writer_thread(file : Path, queue : Queue):
-  with file.open('a', encoding='utf-8') as f:
-    while True:
-      item = queue.get()
-      if item is None:
-        queue.task_done()
-        break
-      
-      f.write(item+'\n')
-      f.flush()
 
-      queue.task_done()
-
-def safe_pos_thread(file : Path, queue : Queue):
-    while True:
-      item = queue.get()
-      if item is None:
-        queue.task_done()
-        break
-      
-      if len(item) == 2:
-        cat, n = item
-        save_position(file, fformat('download', cat, 'size', sep=':'), n)
-
-      queue.task_done()
-
-# def download_media_files(infile: str, categories: list[str], out : str, n_workers : int = 10):
-def download_media_files(pctx :ProgramContext):
+def download_media_files(pctx : ProgramContext):
   """
   Download all media files associated with the input categories in the program context.
 
@@ -131,97 +63,99 @@ def download_media_files(pctx :ProgramContext):
       - Uses a ThreadPoolExecutor to perform paralell downloads based on pctx.max_workers.
   """
   pctx.output_dir.mkdir(parents=True, exist_ok=True)
-  
-  try:
-    with open(pctx.downloaded_files, 'r', encoding='utf-8') as downloads:
-      pctx.downloads_set = set(downloads.read().splitlines())
+  phase_str = 'download'
 
-    with open(pctx.invalid_files, 'r', encoding='utf-8') as invalid_downloads:
-      pctx.failed_downloads_set = set(invalid_downloads.read().splitlines())
+  try:
+    pctx.downloads_set.update(pctx.downloaded_files.read_text(encoding='utf-8').splitlines())
+    pctx.failed_downloads_set.update(pctx.invalid_files.read_text(encoding='utf-8').splitlines())
   except FileNotFoundError:
     pass
 
-  file_category_titles_dict = get_json_data(pctx.found_files)
-  if not file_category_titles_dict:
-    print('No downloadable files found!')
-    print('Make sure to run \'cwbd fetch <arguments>\' first!')
+  file_map = get_json_data(pctx.found_files)
+  if not file_map:
+    print('No downloadable files found! Run \'cwbd fetch\' first.')
     return
   else:
-    n_files = sum(int(entry['n_files']) for entry in file_category_titles_dict.values())
-    save_position(pctx.progress_scanner, fformat('download', 'size', sep=':'), n_files)
+    n_files = sum(int(entry['n_files']) for entry in file_map.values())
+    save_position(pctx.progress_scanner, fformat(phase_str, 'files', 'total', sep=':'), n_files)
 
+    n_categories = len(file_map)
+    save_position(pctx.progress_scanner, fformat(phase_str, 'categories', 'total', sep=':'), n_categories)
 
+  completed_categories = get_progress_dl_categories(pctx.progress_scanner) # (cat, value)
 
+   
+  #----------------------------
+  # Category Loop
+  #--------------------------------
 
-   # TODO: check in progression fril which categories we have had to prevent a lot of calls to single file existences.
-  for category, subfields in file_category_titles_dict.items():
-    # Add recusive-search for easy download of all files found
+  for category, meta in file_map.items():
     if pctx.rsearch:
       if not any(category.startswith(c) for c in pctx.categories):
         continue
     else:
-      if not any(category == c for c in pctx.categories):
+      if category not in pctx.categories:
         continue
-
-    if not (files := subfields.get("files", [])):
-      continue
     
-    cats = get_progress_dl_categories(pctx.progress_scanner)
-    if (category,subfields['n_files'] ) in cats  : # and value == total or size???
+    if (category, meta['n_files']) in completed_categories:
       continue
 
-    cat_n_files = subfields.get("n_files", 0)
+    if not (files := meta.get("files", [])):
+      continue
+
+    out_dir : Path = pctx.output_dir / category
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    start = load_position(pctx.progress_scanner, 
+                          fformat(phase_str, category, sep=':'))
+    total = len(files) if len(files) < 100 else 100 # arbitrary number to prevent downloadign thousands for all categories... could do a proportinate amount? or cli arg?
+    if start >= total:
+      continue
     
-    start = load_position(pctx.progress_scanner, fformat('download', category, 'size', sep=':'))
-    total = 100
+    # otherwise these get skipped during existance check
+    # This is mostly a fix for an issues when the user exits the program before the 
+    # category is finished downloading all files...
+    pctx.downloads_set.update(files[:start])
 
-    log_writer = Queue()
-    dl_writer = Queue()
-
-    log_thread = threading.Thread(target=safe_pos_thread, args=(pctx.progress_scanner, log_writer), daemon=True)
-    log_thread.start()
-
-    dl_thread = threading.Thread(target=writer_thread, args=(pctx.downloaded_files, dl_writer), daemon=True)
-    dl_thread.start()
-
-
-    tracker = PhaseProgressMonitor(total, category)
+    files = files[start:total]
+    if not files:
+      continue
+  
+    # Setup tracker
+    tracker = PhaseProgressMonitor(total, category, pctx.downloaded_files)
     tracker._current = start
-    tracker._matches = start
 
-    with ThreadPoolExecutor(max_workers=pctx.max_workers) as executor:
-      executor.map(download_file, repeat(pctx), files[start:total], repeat(category), repeat(tracker), repeat(log_writer), repeat(dl_writer))
+    with requests.Session() as s:
+      s.headers.update({
+        "User-Agent": "user@gmail.com",
+        "Referer": "https://commons.wikimedia.org/"
+      })
+    
+      with ThreadPoolExecutor(max_workers=pctx.max_workers) as executor:
+        futures = {
+          executor.submit(download_file, s, out_dir, f): f for f in files
+        }
 
-    tracker.finish()
+        for f in as_completed(futures):
+            file_title, succes = f.result()
 
-    log_writer.join()
-    log_writer.put(None)
-    log_thread.join()
-
-    dl_writer.join()
-    dl_writer.put(None)
-    dl_thread.join()
-
-    # save_position(pctx.progress_scanner, fformat('download', category, 'size', sep=':'), cat_n_files)
+            if succes:
+              pctx.downloads_set.add(file_title)
+              tracker._current += 1
+            else:
+              pctx.failed_downloads_set.add(file_title)
 
 
-    try:
-      # if we quit during the processing of a category, the next time we run, it will append the progress from the category... 
-      # TODO: multithread fiel writing is unsafe, but is the solution to track the amount of donwloaded files instead of whole categories...
-      with open(pctx.downloaded_files, 'w', encoding='utf-8') as Wdownloads, \
-        open(pctx.invalid_files, 'w', encoding='utf-8') as Ldownloads:
-        
-        # write succesful downloads after category completed
-        for item in pctx.downloads_set:
-          Wdownloads.write(item + '\n')
-        Wdownloads.flush()
+            save_position(pctx.progress_scanner, 
+                          fformat(phase_str, category, sep=':'),
+                          tracker._current)
+  
+      tracker.finish()          
 
-        # write failed downloads after category completed
-        for item in pctx.failed_downloads_set:
-          Ldownloads.write(item + '\n')
-        Ldownloads.flush()
+    pctx.downloaded_files.write_text(
+      '\n'.join(pctx.downloads_set), encoding='utf-8'
+    )
 
-    except Exception as e:
-      print(e)
-      pass
-
+    pctx.invalid_files.write_text(
+      '\n'.join(pctx.failed_downloads_set), encoding='utf-8'
+    )

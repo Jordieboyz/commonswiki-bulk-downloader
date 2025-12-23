@@ -39,7 +39,7 @@ def scan_commons_db(infile : str, outfile : str, pctx : ProgramContext):
 
   # if use_checkpoints:
   formatted_prog_str = fformat(db_entry, parser['handler'].func.__name__, pctx.save_interval, sep=':')
-  formatted_size_str = fformat(db_entry, 'size', sep=':')
+  formatted_size_str = fformat(db_entry, sep=':')
     
   start = load_position(scanfile, formatted_prog_str)
   end = load_position(scanfile, formatted_size_str)

@@ -2,6 +2,9 @@ import os
 from itertools import repeat
 from concurrent.futures import ThreadPoolExecutor
 import requests
+from pathlib import Path
+from queue import Queue
+import threading
 
 from .context import ProgramContext
 from .progress import PhaseProgressMonitor
@@ -26,7 +29,8 @@ def collect_existing_filenames(folders : list[str]):
   return filenames
 
 
-def download_file(ctx : ProgramContext, file_title : str, outfolder : str, tracker : PhaseProgressMonitor):
+def download_file(ctx : ProgramContext, file_title : str, category : str, tracker : PhaseProgressMonitor, 
+                  log_queue : Queue, dl_queue : Queue):
   """
   Download a wikimedia commons file via Special:FilePath and save it to the ../imgs directory.
   Skips download if the file already exists locally.
@@ -57,7 +61,11 @@ def download_file(ctx : ProgramContext, file_title : str, outfolder : str, track
     return
 
   url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_title}"
-  out_path = os.path.join(outfolder, file_title)
+  
+  out_folder = os.path.join(ctx.output_dir, category)
+  os.makedirs(out_folder, exist_ok=True)
+
+  out_path = os.path.join(out_folder, file_title)
 
   try:
     r = requests.get(url, stream=True, timeout=20, headers=DOWNLOAD_HEADERS)
@@ -67,6 +75,8 @@ def download_file(ctx : ProgramContext, file_title : str, outfolder : str, track
           f.write(chunk)
 
       ctx.downloads_set.add(file_title)
+      dl_queue.put(file_title)
+
       # print(f"[SUCCES] Downloaded: {file_title}")
   except Exception as e:
     ctx.failed_downloads_set.add(file_title)
@@ -75,7 +85,33 @@ def download_file(ctx : ProgramContext, file_title : str, outfolder : str, track
     if tracker:
       tracker._current += 1
       tracker._matches += 1
+    log_queue.put((category, tracker._current))
 
+def writer_thread(file : Path, queue : Queue):
+  with file.open('a', encoding='utf-8') as f:
+    while True:
+      item = queue.get()
+      if item is None:
+        queue.task_done()
+        break
+      
+      f.write(item+'\n')
+      f.flush()
+
+      queue.task_done()
+
+def safe_pos_thread(file : Path, queue : Queue):
+    while True:
+      item = queue.get()
+      if item is None:
+        queue.task_done()
+        break
+      
+      if len(item) == 2:
+        cat, n = item
+        save_position(file, fformat('download', cat, 'size', sep=':'), n)
+
+      queue.task_done()
 
 # def download_media_files(infile: str, categories: list[str], out : str, n_workers : int = 10):
 def download_media_files(pctx :ProgramContext):
@@ -114,11 +150,11 @@ def download_media_files(pctx :ProgramContext):
     n_files = sum(int(entry['n_files']) for entry in file_category_titles_dict.values())
     save_position(pctx.progress_scanner, fformat('download', 'size', sep=':'), n_files)
 
+
+
+
    # TODO: check in progression fril which categories we have had to prevent a lot of calls to single file existences.
   for category, subfields in file_category_titles_dict.items():
-    if category in get_progress_dl_categories(pctx.progress_scanner):
-      continue
-
     # Add recusive-search for easy download of all files found
     if pctx.rsearch:
       if not any(category.startswith(c) for c in pctx.categories):
@@ -129,27 +165,51 @@ def download_media_files(pctx :ProgramContext):
 
     if not (files := subfields.get("files", [])):
       continue
-      
+    
+    cats = get_progress_dl_categories(pctx.progress_scanner)
+    if (category,subfields['n_files'] ) in cats  : # and value == total or size???
+      continue
+
     cat_n_files = subfields.get("n_files", 0)
     
+    start = load_position(pctx.progress_scanner, fformat('download', category, 'size', sep=':'))
+    total = 100
 
-    tracker = PhaseProgressMonitor(cat_n_files, category)
+    log_writer = Queue()
+    dl_writer = Queue()
 
-    out_folder = os.path.join(pctx.output_dir, category)
-    os.makedirs(out_folder, exist_ok=True)
+    log_thread = threading.Thread(target=safe_pos_thread, args=(pctx.progress_scanner, log_writer), daemon=True)
+    log_thread.start()
+
+    dl_thread = threading.Thread(target=writer_thread, args=(pctx.downloaded_files, dl_writer), daemon=True)
+    dl_thread.start()
+
+
+    tracker = PhaseProgressMonitor(total, category)
+    tracker._current = start
+    tracker._matches = start
 
     with ThreadPoolExecutor(max_workers=pctx.max_workers) as executor:
-      executor.map(download_file, repeat(pctx), files, repeat(out_folder), repeat(tracker))
+      executor.map(download_file, repeat(pctx), files[start:total], repeat(category), repeat(tracker), repeat(log_writer), repeat(dl_writer))
 
     tracker.finish()
-    save_position(pctx.progress_scanner, fformat('download', category, 'size', sep=':'), cat_n_files)
+
+    log_writer.join()
+    log_writer.put(None)
+    log_thread.join()
+
+    dl_writer.join()
+    dl_writer.put(None)
+    dl_thread.join()
+
+    # save_position(pctx.progress_scanner, fformat('download', category, 'size', sep=':'), cat_n_files)
 
 
     try:
       # if we quit during the processing of a category, the next time we run, it will append the progress from the category... 
       # TODO: multithread fiel writing is unsafe, but is the solution to track the amount of donwloaded files instead of whole categories...
-      with open(pctx.downloaded_files, 'a', encoding='utf-8') as Wdownloads, \
-        open(pctx.invalid_files, 'a', encoding='utf-8') as Ldownloads:
+      with open(pctx.downloaded_files, 'w', encoding='utf-8') as Wdownloads, \
+        open(pctx.invalid_files, 'w', encoding='utf-8') as Ldownloads:
         
         # write succesful downloads after category completed
         for item in pctx.downloads_set:

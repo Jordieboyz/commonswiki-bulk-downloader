@@ -172,7 +172,7 @@ def count_newlines_mmap(infile):
     with open(infile , "rb") as f:
       with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
         return mm[:].count(b"\n")
-  except:
+  except Exception as e:
     return 0
   
 def get_progress_dl_categories(progress_file, phase_str  : str = 'download'):
@@ -192,7 +192,7 @@ def get_progress_dl_categories(progress_file, phase_str  : str = 'download'):
         if not cat:
           continue
 
-        categories.add(cat)
+        categories.add((cat, int(value)))
   except:
     pass
   return categories

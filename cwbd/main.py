@@ -216,6 +216,7 @@ def print_program_status():
   }
 
   output_files = os.listdir(ctx.checkpoint_dir)
+  n_categories = len(get_json_data(ctx.found_files)) # computational heavy, watch this one carefully.
 
   # enforce order of phases and retrieve output files for matches found
   for file in output_files:
@@ -235,10 +236,10 @@ def print_program_status():
         read_lines = load_position(ctx.progress_scanner, formatted_prog_str)
       else:
           PHASE_TOTALS[phase_str] = total_end
-          for c in  get_progress_dl_categories(ctx.progress_scanner):
-            read_lines += int(load_position(ctx.progress_scanner, fformat(phase_str, c, 'size', sep=':')))
+          progress_categories = get_progress_dl_categories(ctx.progress_scanner)
+          read_lines = sum([size for (c, size) in progress_categories])
 
-      found_matches = count_newlines_mmap(output_file)
+      found_matches = count_newlines_mmap(ctx.checkpoint_dir / output_file)
 
       if total_end and read_lines >= total_end:
         state = "completed"
@@ -248,13 +249,15 @@ def print_program_status():
         state = "initialized"
 
       if read_lines > 0:
-        progress = f"{read_lines:,} / {PHASE_TOTALS[phase_str]:,} lines"
+        progress = f"{read_lines:,} \t/ {PHASE_TOTALS[phase_str]:,} lines"
       else:
         progress = f"{read_lines:,} lines read"
 
       status_lines.append(f"{phase_no}. {phase_str.capitalize():<16}: {state}")
       status_lines.append(f"    Input progress : {progress}")
-      status_lines.append(f"    Matches  found : {found_matches}")
+      if phase_str == 'download':
+        status_lines.append(f"                   : {f"{len(progress_categories):,}  \t/ {n_categories:,} categories"}")
+      status_lines.append(f"    Matches  found : {found_matches:,}")
       status_lines.append("")
       
   if len(status_lines) < 2:

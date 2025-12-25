@@ -12,8 +12,11 @@ class AdaptiveRateLimiter:
     self._pause = threading.Event()
     self._pause.set()
 
+    self._sleeping = False
+
   def wait(self):
     self._pause.wait()
+    time.sleep(self._delay)
 
   def success(self):
     with self._lock:
@@ -21,14 +24,21 @@ class AdaptiveRateLimiter:
 
   def backoff(self, retry_after : float | None = None):
     with self._lock:
-      if retry_after is not None:
-        self._delay = min(self.max, retry_after)
-      else:
-        self._delay = min(self.max, self._delay * self.factor)
-
+      if self._sleeping:
+        return
+      
+      self._sleeping = True
       self._pause.clear()
-      delay = self._delay
 
+      if retry_after is not None:
+        delay = min(self.max, float(retry_after))
+      else:
+        delay = min(self.max, self._delay * self.factor)
+
+      self._delay = delay
     # global sleep
     time.sleep(delay)
-    self._pause.set()
+
+    with self._lock:
+      self._sleeping = False
+      self._pause.set()

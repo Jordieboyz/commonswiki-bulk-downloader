@@ -7,7 +7,7 @@ from .progress import PhaseProgressMonitor
 from .cwbd_utils import *
 from .rateLimiter import AdaptiveRateLimiter
 
-def download_file(session : requests.Session, rate : AdaptiveRateLimiter, out_dir : Path, file_title : str):
+def download_file(session : requests.Session, rate : AdaptiveRateLimiter, out_dir : Path, file_title : str, max_retries  : int = 5):
   """
   Download a wikimedia commons file via Special:FilePath and save it to the ../imgs directory.
   Skips download if the file already exists locally.
@@ -24,32 +24,35 @@ def download_file(session : requests.Session, rate : AdaptiveRateLimiter, out_di
       - Uses stream download to handle lage images efficiently.
       - Succesful downloads are tracked in ctx.downloads_set.
   """
-  rate.wait()
-
   url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{file_title}"
   out_path = out_dir / file_title
 
-  try:
-    r = session.get(url, stream=True, timeout=20)
-    if r.status_code != 200:
-      if r.status_code == 429:
+  for attempt in range(1, max_retries + 1):
+    rate.wait()
+
+    try:
+      r = session.get(url, stream=True, timeout=20)
+
+      if r.status_code == 200:
+        with open(out_path, "wb") as f:
+          for chunk in r.iter_content(2 * 1024 * 1024):
+            f.write(chunk)
+
+        rate.success()
+        return file_title, True
+
+      elif r.status_code == 429:
         retry_after = r.headers.get("Retry-After")
-        rate.backoff(
-            float(retry_after) if retry_after and retry_after.isdigit() else None
-        )
+        rate.backoff(retry_after if retry_after and retry_after.isdigit() else None)
+        continue
+
+      elif 500 <= r.status_code < 600:
+        rate.backoff()
+        continue
+
+    except:
       return file_title, False
-
-    with open(out_path, "wb") as f:
-      for chunk in r.iter_content(2 * 1024 * 1024):
-        f.write(chunk)
-
-    rate.success()
-
-    return file_title, True
-
-  except Exception as e:
-    excep = e
-    return file_title, False
+  return file_title, False
 
 
 def download_media_files(pctx : ProgramContext):
@@ -130,7 +133,7 @@ def download_media_files(pctx : ProgramContext):
     rate_limiter = AdaptiveRateLimiter()
 
     # Setup tracker
-    tracker = PhaseProgressMonitor(total, category, pctx.downloaded_files)
+    tracker = PhaseProgressMonitor(total, category, pctx.downloaded_files) # maybe we need to check Entries: 
     tracker._current = start
 
     with requests.Session() as s:
@@ -145,21 +148,18 @@ def download_media_files(pctx : ProgramContext):
         }
 
         for f in as_completed(futures):
-            file_title, succes = f.result()
+          file_title, succes = f.result()
 
-            if succes:
-              pctx.downloads_set.add(file_title)
-              tracker._current += 1
+          if succes:
+            pctx.downloads_set.add(file_title)
+            tracker._current += 1
 
-              save_position(pctx.progress_scanner, 
+            save_position(pctx.progress_scanner, 
                           fformat(phase_str, category, sep=':'),
                           tracker._current)
               
-            else:
-              pctx.failed_downloads_set.add(file_title)
-
-
-
+          else:
+            pctx.failed_downloads_set.add(file_title)
   
       tracker.finish()          
 
